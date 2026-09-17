@@ -45,7 +45,7 @@ No build step, API key, external tile service, account integration, or Sites hos
 
 This is an early scale and layout study, not a validated reconstruction of 1838. Footprints come from the supplied GeoJSON based on the 1860 Hexamer & Locher atlas. Supplied heights are feet to the roofline, converted to meters; inferred roofs extend above them. Names and uses have not been verified for 1838–1840.
 
-Façades, colors, window and door placement, roof forms, and chimneys are procedural approximations informed by the supplied references. Dormers and building-specific landmark architecture remain to be modeled. Ground is a provisional shared surface: detailed streets, sidewalks and yards remain to be added. Doors are not enterable; collision checks are basic. This prototype is best reviewed on a desktop with WebGL support.
+Façades, colors, window and door placement, roof forms, and chimneys are procedural approximations informed by the supplied references. Dormers and building-specific landmark architecture remain to be modeled. Street corridors now have cobblestone paving, raised flagstone sidewalks and curbs; yards retain an earth surface. Corridor locations and widths are approximate and need verification against the historic map. Doors are not enterable; collision checks are basic. This prototype is best reviewed on a desktop with WebGL support.
 
 Building 195 has unknown material (value 3), shown in gray on its main walls. Building 236 uses primary height 36 feet; height2 is 48. The original data is preserved. Polygon exterior rings are used; interior holes are not modeled in this prototype.
 
@@ -57,10 +57,11 @@ Map sources:
 
 Three.js is distributed under its included MIT license. This notice does not assign a license to the user's building data or project.
 
-## Update: roofs, trees and logo
 
-Replace the existing public/app.js and public/index.html, and add public/1838Logo.png. Alternatively upload the whole public folder from this package, replacing matching files. Cloudflare Pages will deploy the committed update through the existing GitHub connection.
+## Current update: streetscape
 
-Roofs now follow each footprint's oriented bounds with low provisional pitches; irregular buildings use a shallow single slope. Roof end faces have texture coordinates, and chimney placement is checked against footprints. These are visual approximations pending individual roof research. Mature trees have branching trunks and irregular canopies; locations are interpretive and checked against building footprints. Your original logo is used unchanged as the browser favicon and touch icon.
+Trees have been removed. Roof geometry is unchanged from the preceding version. This update adds cobblestone street surfaces, raised flagstone sidewalks, curbs, warmer brick variations and simple canvas awnings on eligible storefronts. Walking eye height follows the sidewalk elevation. The initial view is centered on Lombard Street. Your logo remains the browser icon.
 
-The updated local view was visually inspected with trees and lower rooflines visible. Browser icons may require a hard refresh to clear the previous cached icon.
+Surface treatments and storefront details are interpretive, guided by the supplied stylized reference images; they are not verified individual 1840 details. Local street rendering and JavaScript syntax were checked.
+
+To update GitHub, replace public/app.js and public/index.html using this package, or upload all of the public folder contents into the existing public folder. Commit to trigger the connected Cloudflare deployment.
