@@ -14,18 +14,63 @@ try{
 const data=await(await fetch('./buildings.geojson')).json();for(const f of data.features)for(const poly of f.geometry.coordinates){const pts=poly[0].slice(0,-1).map(project),p=f.properties;buildings.push({pts,p,h:p.height*.3048,minX:Math.min(...pts.map(v=>v.x)),maxX:Math.max(...pts.map(v=>v.x)),minZ:Math.min(...pts.map(v=>v.y)),maxZ:Math.max(...pts.map(v=>v.y))})}
 for(const b of buildings){const {pts,p,h}=b,shape=new T.Shape(pts.map(v=>new T.Vector2(v.x,-v.y))),g=new T.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false});g.rotateX(-Math.PI/2);const mesh=new T.Mesh(g,p.material==='wood'?wood:p.material==='brick'?brick:unknown);mesh.castShadow=mesh.receiveShadow=true;mesh.userData.building=b;scene.add(mesh);wallMeshes.push(mesh);
 const cx=(b.minX+b.maxX)/2,cz=(b.minZ+b.maxZ)/2,w=b.maxX-b.minX,d=b.maxZ-b.minZ;
-// Provisional pitched roof, clipped to the actual footprint on each side of the ridge.
-if(p.type!=='wall'){let acrossX=w<d,mid=acrossX?cx:cz,span=acrossX?w:d,rise=Math.min(span*.4,3),positions=[];
-for(let side of [-1,1]){let clipped=[];for(let i=0;i<pts.length;i++){let a=pts[i],q=pts[(i+1)%pts.length],av=(acrossX?a.x:a.y)-mid,bv=(acrossX?q.x:q.y)-mid;if(av*side>=0)clipped.push(a.clone());if(av*bv<0){let t=av/(av-bv);clipped.push(a.clone().lerp(q,t))}}if(clipped.length>=3){let triangles=T.ShapeUtils.triangulateShape(clipped,[]);for(let tri of triangles)for(let j of tri){let v=clipped[j],k=acrossX?v.x:v.y;positions.push(v.x,h+rise*Math.max(0,1-Math.abs(k-mid)/(span/2)),v.y)}}}
-const rg=new T.BufferGeometry();rg.setAttribute('position',new T.Float32BufferAttribute(positions,3));rg.computeVertexNormals();let cap=new T.Mesh(rg,roof);cap.castShadow=true;scene.add(cap);
-// Close the gable ends with wall-colored triangles.
-const end=[];for(let i=0;i<pts.length;i++){let a=pts[i],q=pts[(i+1)%pts.length];let av=(acrossX?a.x:a.y)-mid,bv=(acrossX?q.x:q.y)-mid;let chain=[a];if(av*bv<0)chain.push(a.clone().lerp(q,av/(av-bv)));chain.push(q);for(let j=0;j<chain.length-1;j++){let v=chain[j],u=chain[j+1],vh=h+rise*Math.max(0,1-Math.abs((acrossX?v.x:v.y)-mid)/(span/2)),uh=h+rise*Math.max(0,1-Math.abs((acrossX?u.x:u.y)-mid)/(span/2));end.push(v.x,h,v.y,u.x,h,u.y,v.x,vh,v.y,u.x,h,u.y,u.x,uh,u.y,v.x,vh,v.y)}}let eg=new T.BufferGeometry();eg.setAttribute('position',new T.Float32BufferAttribute(end,3));eg.computeVertexNormals();scene.add(new T.Mesh(eg,p.material==='wood'?wood:brick));if(w>3&&d>4)box(brick,cx+w*.28,h+rise*.65,cz+d*.2,.7,1.8,.85)}
+// Fit roof axes to the building edges, not the world-coordinate bounding box.
+if(p.type!=='wall'){
+let fit=null;
+for(let i=0;i<pts.length;i++){
+ const edge=pts[(i+1)%pts.length].clone().sub(pts[i]);if(edge.length()<.5)continue;edge.normalize();
+ const normal=new T.Vector2(-edge.y,edge.x),us=pts.map(v=>v.dot(edge)),vs=pts.map(v=>v.dot(normal));
+ const u0=Math.min(...us),u1=Math.max(...us),v0=Math.min(...vs),v1=Math.max(...vs),area=(u1-u0)*(v1-v0);
+ if(!fit||area<fit.area)fit={edge,normal,u0,u1,v0,v1,area};
+}
+if(fit){
+ const {edge,normal,u0,u1,v0,v1}=fit;
+ const local=pts.map(v=>new T.Vector2(v.dot(edge),v.dot(normal)));
+ const acrossU=u1-u0<v1-v0,lo=acrossU?u0:v0,hi=acrossU?u1:v1,mid=(lo+hi)/2,span=hi-lo;
+ const area=Math.abs(T.ShapeUtils.area(local)),regular=area/fit.area>.86;
+ // Low provisional pitches keep unverified roofs subordinate to the street façades.
+ const rise=Math.min(span*.12,p.type==='church'?1.5:.85);
+ const height=v=>regular?h+rise*Math.max(0,1-Math.abs((acrossU?v.x:v.y)-mid)/(span/2)):h+.12+rise*((acrossU?v.x:v.y)-lo)/span;
+ const world=v=>edge.clone().multiplyScalar(v.x).addScaledVector(normal,v.y);
+ const positions=[],ends=[];
+ const pieces=regular?[-1,1]:[0];
+ for(const side of pieces){let clipped=[];
+  if(!side)clipped=local;
+  else for(let i=0;i<local.length;i++){const a=local[i],q=local[(i+1)%local.length],av=(acrossU?a.x:a.y)-mid,bv=(acrossU?q.x:q.y)-mid;if(av*side>=-1e-8)clipped.push(a.clone());if(av*bv<0)clipped.push(a.clone().lerp(q,av/(av-bv)))}
+  if(clipped.length<3)continue;
+  for(const tri of T.ShapeUtils.triangulateShape(clipped,[]))for(const j of tri){const v=clipped[j],w=world(v);positions.push(w.x,height(v),w.y)}
+ }
+ for(let i=0;i<local.length;i++){const a=local[i],q=local[(i+1)%local.length],av=(acrossU?a.x:a.y)-mid,bv=(acrossU?q.x:q.y)-mid,chain=[a];if(regular&&av*bv<0)chain.push(a.clone().lerp(q,av/(av-bv)));chain.push(q);
+  for(let j=0;j<chain.length-1;j++){const v=chain[j],u=chain[j+1],vw=world(v),uw=world(u);ends.push(vw.x,h,vw.y,uw.x,h,uw.y,vw.x,height(v),vw.y,uw.x,h,uw.y,uw.x,height(u),uw.y,vw.x,height(v),vw.y)}
+ }
+ function roofMesh(vertices,material){const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(vertices,3));const uv=[];for(let i=0;i<vertices.length;i+=3)uv.push((vertices[i]+vertices[i+2])*.5,vertices[i+1]);geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.computeVertexNormals();const m=new T.Mesh(geo,material);m.castShadow=m.receiveShadow=true;scene.add(m)}
+ roofMesh(positions,roof);roofMesh(ends,p.material==='wood'?wood:p.material==='brick'?brick:unknown);
+ // Locate chimneys on the footprint rather than outside concave rear wings.
+ const candidate=new T.Vector2(u0+(u1-u0)*.3,v0+(v1-v0)*.3),wp=world(candidate);
+ if(span>2.5&&inside(wp.x,wp.y,pts))box(brick,wp.x,height(candidate)+.5,wp.y,.55,1.2,.7,Math.atan2(-edge.y,edge.x));
+}
+}
 if(p.type==='wall')continue;
 let area=0;for(let i=0;i<pts.length;i++){let a=pts[i],q=pts[(i+1)%pts.length];area+=a.x*q.y-q.x*a.y}
 let entrance=false;for(let i=0;i<pts.length;i++){const a=pts[i],q=pts[(i+1)%pts.length],dx=q.x-a.x,dz=q.y-a.y,len=Math.hypot(dx,dz);if(len<2.4)continue;const ux=dx/len,uz=dz/len,sign=area>0?1:-1,nx=uz*sign,nz=-ux*sign,mx=(a.x+q.x)/2,mz=(a.y+q.y)/2;if(blocked(mx+nx*.7,mz+nz*.7,b))continue;const angle=Math.atan2(-uz,ux),n=Math.max(1,Math.floor(len/2.5)),floors=Math.max(1,Math.round(p.height/12));
 const put=(mat,t,y,ww,hh,dd,off=.06)=>box(mat,a.x+ux*t+nx*off,y,a.y+uz*t+nz*off,ww,hh,dd,angle);
 for(let j=0;j<n;j++){let t=len*(j+.5)/n;if(blocked(a.x+ux*t+nx*.8,a.y+uz*t+nz*.8,b))continue;for(let f=0;f<floors;f++){let yy=f*3.6576+2.0,wh=f===floors-1?1.32:1.65,ww=Math.min(1.0,len/n*.5);const isDoor=f===0&&j===0&&len<15;const shop=f===0&&p.type.includes('store')&&!isDoor;if(isDoor){put(trim,t,1.45,1.25,2.7,.18);put(door,t,1.35,1,2.45,.2,.18);put(glass,t,2.55,.9,.3,.22,.19);put(stone,t,.15,1.45,.3,.9,.4);entrance=true;continue}if(shop){ww=Math.min(1.7,len/n*.8);wh=2.2;yy=1.8}put(trim,t,yy,ww+.2,wh+.18,.13);put(glass,t,yy,ww,wh,.17,.13);put(trim,t,yy,.045,wh,.2,.19);put(trim,t,yy,ww,.045,.2,.19);if(!shop){put(shutter,t-ww*.78,yy,ww*.43,wh,.15);put(shutter,t+ww*.78,yy,ww*.43,wh,.15)}}}put(trim,len/2,h-.16,len,.23,.3);}
 }
+// Provisional mature street trees; positions are checked against mapped footprints.
+const bark=new T.MeshStandardMaterial({color:0x62513b,roughness:1});
+const leafMaterials=[0x435b32,0x536b38,0x657744,0x78874c].map(color=>new T.MeshStandardMaterial({color,roughness:1}));
+const leafTransforms=leafMaterials.map(()=>[]);let treeSeed=1838;
+const random=()=>((treeSeed=(treeSeed*16807)%2147483647)/2147483647);
+function branch(a,b,r1,r2){const direction=b.clone().sub(a),mesh=new T.Mesh(new T.CylinderGeometry(r2,r1,direction.length(),7),bark);mesh.position.copy(a).add(b).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize());mesh.castShadow=true;scene.add(mesh)}
+function tree(x,z){const height=10+random()*3;branch(new T.Vector3(x,0,z),new T.Vector3(x+.18,height*.7,z),.29,.13);
+ for(let arm=0;arm<6;arm++){const angle=arm*Math.PI/3+random()*.5,radius=2+random()*1.6,center=new T.Vector3(x+Math.cos(angle)*radius,height*.7+random()*2,z+Math.sin(angle)*radius);branch(new T.Vector3(x,height*.42,z),center,.12,.035);
+ for(let n=0;n<25;n++){const angle2=random()*Math.PI*2,rr=Math.sqrt(random())*2.3,o=new T.Object3D();o.position.set(center.x+Math.cos(angle2)*rr,center.y+(random()-.4)*2.5,center.z+Math.sin(angle2)*rr);o.scale.set(.65+random()*.8,.55+random()*.6,.65+random()*.8);o.rotation.set(random()*3,random()*3,random()*3);o.updateMatrix();leafTransforms[Math.floor(random()*4)].push(o.matrix.clone())}}
+}
+let treeCount=0;
+for(let i=0;i<13;i++){const lng=-75.15445+i*.000255,lat=39.94302-(lng+75.1528)*.16; // local approximation of the Lombard corridor
+ for(const side of [1,-1]){if((i+(side===1?0:1))%2)continue;const point=project([lng,lat+side*.000043]);let clear=true;for(let a=0;a<8;a++){const theta=a*Math.PI/4;if(blocked(point.x+Math.cos(theta)*1.1,point.y+Math.sin(theta)*1.1))clear=false}if(clear){tree(point.x,point.y);treeCount++}}
+}
+for(let i=0;i<leafMaterials.length;i++){const matrices=leafTransforms[i],leaves=new T.InstancedMesh(new T.IcosahedronGeometry(1,1),leafMaterials[i],matrices.length);matrices.forEach((m,j)=>leaves.setMatrixAt(j,m));leaves.castShadow=leaves.receiveShadow=true;scene.add(leaves)}
 for(const [mat,matrices] of buckets){const inst=new T.InstancedMesh(new T.BoxGeometry(1,1,1),mat,matrices.length);matrices.forEach((m,i)=>inst.setMatrixAt(i,m));inst.castShadow=inst.receiveShadow=true;scene.add(inst)}
 function reset(){overhead=false;$('#overview').textContent='View from above';const v=project([-75.1528,39.94302]);camera.position.set(v.x,1.7,v.y);if(blocked(v.x,v.y)){for(let z=-20;z<30;z+=1){if(!blocked(v.x,z)){camera.position.z=z;break}}}yaw=-Math.PI/2;pitch=0;camera.rotation.set(pitch,yaw,0);$('#location').textContent='Lombard Street';}
 reset();$('#loading').remove();$('#reset').onclick=reset;$('#overview').onclick=()=>{overhead=!overhead;if(overhead){camera.position.set(10,230,120);camera.lookAt(0,0,0);$('#overview').textContent='Back to street';$('#location').textContent='Neighborhood overview'}else reset()};

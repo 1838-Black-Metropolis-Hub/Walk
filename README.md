@@ -56,3 +56,11 @@ Map sources:
 - https://www.philageohistory.org/rdic-images/view-image.cfm/HXL1860v1-pl05
 
 Three.js is distributed under its included MIT license. This notice does not assign a license to the user's building data or project.
+
+## Update: roofs, trees and logo
+
+Replace the existing public/app.js and public/index.html, and add public/1838Logo.png. Alternatively upload the whole public folder from this package, replacing matching files. Cloudflare Pages will deploy the committed update through the existing GitHub connection.
+
+Roofs now follow each footprint's oriented bounds with low provisional pitches; irregular buildings use a shallow single slope. Roof end faces have texture coordinates, and chimney placement is checked against footprints. These are visual approximations pending individual roof research. Mature trees have branching trunks and irregular canopies; locations are interpretive and checked against building footprints. Your original logo is used unchanged as the browser favicon and touch icon.
+
+The updated local view was visually inspected with trees and lower rooflines visible. Browser icons may require a hard refresh to clear the previous cached icon.
