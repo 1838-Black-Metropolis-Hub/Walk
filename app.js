@@ -77,14 +77,14 @@ const STYLES={
  daguerreotype:{label:'Daguerreotype',sky:[[0,'#6d6a62'],[.35,'#b5b0a4'],[.47,'#d9d3c6'],[.52,'#d9d3c6'],[1,'#d9d3c6']],clouds:30,cloudTint:[225,220,210],bg:'#d9d3c6',fog:[70,330],hemi:[0xd8d2c4,0x4a443c,1.5],sun:[0xfff0dc,2.6,[-70,60,90]],exposure:.95,env:.4,leaves:[0x8f8a70,0x9c9678,0x85805f,0x9a9370,0x8f8a70],glow:.3,post:{vignette:.85,grain:.09,warm:0,sepia:.9,sat:.2,contrast:1.15,blur:1.2},sao:.01,bloom:.25},
  dusk:{label:'Dusk',sky:[[0,'#1a2440'],[.25,'#3b4a78'],[.42,'#b3708a'],[.5,'#f0a86a'],[.53,'#2a2a34'],[1,'#2a2a34']],clouds:50,cloudTint:[190,140,150],bg:'#2a2a34',fog:[80,360],hemi:[0x3d4a7a,0x2a2018,1.1],sun:[0xff9a55,1.6,[-140,14,40]],exposure:.9,env:.35,leaves:[0x8a6b2a,0x9a7a32,0x7a5f26,0x6a6a34,0x8a6b2a],glow:5,windows:true,post:{vignette:.6,grain:.05,warm:0,sat:1.05,contrast:1.08},sao:.012,bloom:.6}};
 queueMicrotask(()=>{stucco.userData.kind='stucco';regStyleMat(stucco);regStyleMat(roof);regStyleMat(earth);regStyleMat(cobbles);regStyleMat(brickwalk);regStyleMat(curbMat);regStyleMat(trim);regStyleMat(marble);regStyleMat(bark);applyStyle(styleName)});
-let styleName=localStorage.getItem('bm-style')||'documentary';
-function applyStyle(name){const S=STYLES[name]||STYLES.documentary;styleName=name;localStorage.setItem('bm-style',name);
+let styleName='atlas';
+function applyStyle(name){const S=STYLES[name]||STYLES.atlas;styleName=name;
  buildSky(S.sky,S.clouds,S.cloudTint);scene.background.set(S.bg);scene.fog.color.set(S.bg);scene.fog.near=S.fog[0];scene.fog.far=S.fog[1];
  hemi.color.setHex(S.hemi[0]);hemi.groundColor.setHex(S.hemi[1]);hemi.intensity=S.hemi[2];sun.color.setHex(S.sun[0]);sun.intensity=S.sun[1];sun.position.set(...S.sun[2]);renderer.toneMappingExposure=S.exposure;scene.environmentIntensity=S.env;
  leafMats.forEach((m,i)=>{m.color.setHex(S.leaves[i%S.leaves.length]);m.flatShading=!!S.flatLeaves;m.needsUpdate=true});lampGlow.emissiveIntensity=S.glow;windowGlow.emissiveIntensity=S.windows?1.6:0;windowGlow.color.setHex(S.windows?0xffe2a8:0x1d2a30);
  const u=grade.uniforms,d={vignette:.45,grain:.035,warm:.5,sepia:0,mono:0,posterize:0,ink:0,paper:0,blur:0,sat:1,contrast:1};for(const k in d)u[k].value=S.post[k]??d[k];sao.params.saoIntensity=S.sao;bloom.strength=S.bloom;
  for(const [m,base] of styleMats){m.color.setHex(base);if(S.tints){const t=m.userData.kind&&S.tints[m.userData.kind];if(t)m.color.setHex(t)}if(m.map){m.map.repeat.set(m.userData.rep??m.map.repeat.x,m.userData.rep??m.map.repeat.y)}m.flatShading=!!S.flat;m.roughness=S.flat?1:(m.userData.rough??m.roughness);m.needsUpdate=true}
- $('#stylename').textContent=S.label;document.querySelectorAll('#styleitems button').forEach(b=>b.classList.toggle('on',b.dataset.style===name))}
+}
 const groundGeo=new T.PlaneGeometry(850,850);groundGeo.attributes.uv.array.forEach((v,i,arr)=>arr[i]=v*300);const ground=new T.Mesh(groundGeo,cobbles);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
 
 // ---- instancing ----
@@ -261,7 +261,6 @@ function reset(){leaveOverhead();walkTarget=null;const v=streetWorld(-52,-6);cam
 reset();$('#loading').remove();$('#reset').onclick=reset;
 $('#overview').onclick=()=>{overhead=!overhead;walkTarget=null;if(overhead){camera.position.set(camera.position.x,180,camera.position.z+60);camera.rotation.set(-1.25,0,0);$('#overview').textContent='Back to street';$('#location').textContent='Neighborhood overview';$('#hint').textContent='Click a building to go to its front door · Drag to pan · Scroll to zoom'}else reset()};
 
-for(const [k,S] of Object.entries(STYLES)){const bt=document.createElement('button');bt.dataset.style=k;bt.textContent=S.label;bt.onclick=()=>{applyStyle(k);$('#stylelist').hidden=true};$('#styleitems').append(bt)}$('#style').onclick=()=>{$('#stylelist').hidden=!$('#stylelist').hidden;$('#info').hidden=true;$('#placelist').hidden=true};
 $('#about').onclick=()=>{$('#info').hidden=!$('#info').hidden;$('#placelist').hidden=true};$('#places').onclick=()=>{$('#placelist').hidden=!$('#placelist').hidden;$('#info').hidden=true};document.querySelectorAll('[data-close]').forEach(bt=>bt.onclick=()=>$('#'+bt.dataset.close).hidden=true);
 // ---- first-person walk: drag to look, click the street to walk there, scroll to glide, W A S D to walk ----
 function pick(cx,cy){ray.setFromCamera(new T.Vector2((cx/innerWidth)*2-1,-(cy/innerHeight)*2+1),camera);const hit=ray.intersectObjects([ground,...pavingMeshes])[0];if(!hit)return null;const p=hit.point;if(blocked(p.x,p.z))return null;return p}
