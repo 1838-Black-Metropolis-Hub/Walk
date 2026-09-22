@@ -12,3 +12,5 @@ aside{position:absolute;top:86px;right:28px;max-height:75vh;overflow:auto;width:
 #touch{display:none;position:absolute;bottom:130px;right:20px;text-align:center}#touch button{padding:12px 18px;margin:2px;touch-action:none}
 @media(pointer:coarse){#touch{display:block}}
 @media(max-width:800px){header{top:16px;left:16px}h1{font-size:28px}header p{display:none}#top{top:100px;left:16px;right:16px;gap:5px;flex-wrap:wrap}#top button{font-size:13px;padding:8px}footer{left:12px;right:12px;bottom:12px;padding:12px}footer span{font-size:12px;max-width:240px}#map{left:16px;width:140px;height:105px}aside{top:150px;right:16px;max-height:55vh}}
+
+#styleitems{display:grid;gap:6px}#styleitems button{text-align:left;padding:12px 14px}#styleitems button.on{background:#d9b16d;color:#2b1b12}#stylelist{width:280px}
